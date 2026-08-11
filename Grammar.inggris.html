@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Grammar Translator</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #2c3e50; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            box-sizing: border-box;
+        }
+        .container { 
+            background: white; 
+            padding: 40px 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3); 
+            max-width: 600px; 
+            width: 100%; 
+            box-sizing: border-box;
+        }
+        h2 { text-align: center; color: #2c3e50; margin-top: 0; margin-bottom: 25px; }
+        .input-area { margin-bottom: 20px; }
+        input[type="text"] { 
+            width: 100%; 
+            padding: 15px; 
+            border: 2px solid #bdc3c7; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        button { 
+            width: 100%; 
+            padding: 15px; 
+            background-color: #3498db; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            margin-top: 15px;
+            transition: background 0.3s ease;
+        }
+        button:hover { background-color: #2980b9; }
+        
+        #loading {
+            text-align: center;
+            color: #f39c12;
+            font-weight: bold;
+            margin-top: 20px;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+
+        .result-box { 
+            margin-top: 25px; 
+            padding: 20px; 
+            background-color: #f8f9fa; 
+            border-left: 5px solid #27ae60; 
+            border-radius: 6px; 
+            display: none; 
+        }
+        .result-box p { margin: 10px 0; line-height: 1.6; font-size: 15px; }
+        
+        /* Tambahan style untuk kotak penjelasan */
+        .explanation-box {
+            background-color: #e8f4f8; 
+            border-left: 4px solid #3498db; 
+            padding: 15px; 
+            margin-top: 20px; 
+            border-radius: 4px;
+        }
+        .explanation-box p { margin-top: 0; margin-bottom: 10px; color: #2c3e50; font-size: 14.5px; }
+        .explanation-box ul { margin: 0; padding-left: 20px; color: #2c3e50; font-size: 14.5px; }
+        .explanation-box li { margin-bottom: 6px; }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Alat Bedah Grammar AI 🤖</h2>
+    
+    <div class="input-area">
+        <input type="text" id="indo" placeholder="Ketik kalimat bebas di sini..." onkeypress="handleEnter(event)">
+        <button onclick="prosesDenganAI()">Terjemahkan & Bedah!</button>
+    </div>
+
+    <div id="loading">AI sedang berpikir dan menyusun penjelasan... 🧠</div>
+
+    <div class="result-box" id="result"></div>
+</div>
+
+<script>
+    const API_KEY = "AQ.Ab8RN6KlFMRMM6eQ3cMYsWV4nU_Ox1kO2QhEszEH8g8WyrNoWg";
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
+
+    function handleEnter(event) {
+        if (event.key === "Enter") {
+            prosesDenganAI();
+        }
+    }
+
+    async function prosesDenganAI() {
+        const inputText = document.getElementById('indo').value.trim();
+        const resultBox = document.getElementById('result');
+        const loading = document.getElementById('loading');
+
+        if(!inputText) {
+            alert("Ketik kalimat bahasa Indonesia-nya dulu ya!");
+            return;
+        }
+
+        loading.style.display = 'block';
+        resultBox.style.display = 'none';
+
+        // PROMPT DIPERBARUI: Menambahkan fitur penjelasan grammar (reasoning)
+        const promptSystem = `
+            Kamu adalah ahli dan guru grammar bahasa Inggris yang ramah. 
+            Saya akan memberikan sebuah kalimat bahasa Indonesia.
+            Tugasmu adalah menerjemahkan, membedahnya, dan MENJELASKAN alasannya agar saya bisa belajar.
+            
+            ATURAN BEDAH GRAMMAR (WAJIB DIIKUTI):
+            1. FORMAT RUMUS: Tuliskan Kata Bahasa Inggrisnya TERLEBIH DAHULU, lalu diikuti jenis katanya di dalam kurung biasa "()".
+               - BENAR: I (Subject) + want (Verb 1) + to take (Verb 1) + a shower (Object)
+            2. Sebutkan Tense yang digunakan di akhir rumus menggunakan kurung siku "[]" (misal: [Simple Present Tense]).
+            3. Untuk Kata Kerja (Verb), WAJIB sebutkan jenisnya (Verb 1, Verb 2, atau Verb 3).
+            4. JIKA ada penambahan akhiran pada Verb atau Object (seperti s, es, ed, en, ing), tunjukkan pemecahannya di dalam kurung!
+               - Contoh: playing (Verb 1 + ing / play + ing)
+            5. PENJELASAN (PENTING): Buat penjelasan singkat dan padat berbentuk bullet points (<ul><li>) tentang MENGAPA menggunakan tense tersebut, dan MENGAPA bentuk verb/to be-nya seperti itu (misal: kenapa subjek ini pakai 'is/am/are', kenapa kata kerja ini ditambah 's', dll).
+            
+            Berikan balasan TEPAT menggunakan format HTML ini saja, tanpa teks basa-basi lain:
+            <h4>Berhasil Dianalisis! ✅</h4>
+            <p><strong>Rumus Grammar:</strong><br><br> <span style="background:white; border:1px solid #ddd; padding:6px 10px; border-radius:4px; font-family:monospace; color:#c0392b; font-weight:bold; display:inline-block; line-height:1.6;">[Tulis rumus detailnya di sini]</span></p>
+            <p><strong>Kalimat Utuh:</strong><br> <span style="font-size:18px; font-weight:bold; color:#2980b9;">[Isi kalimat bahasa Inggrisnya]</span></p>
+            <div class="explanation-box">
+                <p><strong>💡 Penjelasan Grammar:</strong></p>
+                [Isi penjelasanmu di sini dalam bentuk list HTML <ul><li> dengan bahasa Indonesia yang ramah, mudah dipahami pemula]
+            </div>
+
+            Kalimat dari pengguna: "${inputText}"
+        `;
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "X-goog-api-key": API_KEY 
+                },
+                body: JSON.stringify({
+                    contents: [
+                        {
+                            parts: [
+                                { text: promptSystem }
+                            ]
+                        }
+                    ]
+                })
+            });
+
+            const data = await response.json();
+            loading.style.display = 'none';
+
+            if (!response.ok) {
+                resultBox.innerHTML = `
+                    <p style="color:red; font-weight:bold;">Terdapat Kesalahan (Error HTTP ${response.status}):</p>
+                    <p style="color:#c0392b;">${data.error ? data.error.message : 'Unknown error'}</p>
+                `;
+                resultBox.style.display = 'block';
+                return;
+            }
+
+            if (data.candidates && data.candidates.length > 0) {
+                const aiResponseText = data.candidates[0].content.parts[0].text;
+                let cleanHTML = aiResponseText.replace(/```html/g, "").replace(/```/g, "");
+                resultBox.innerHTML = cleanHTML;
+                resultBox.style.display = 'block';
+            } else {
+                resultBox.innerHTML = `<p style="color:red;">Error: AI tidak merespons sesuai format.</p>`;
+                resultBox.style.display = 'block';
+            }
+
+        } catch (error) {
+            loading.style.display = 'none';
+            resultBox.innerHTML = `<p style="color:red;">Koneksi gagal! Pastikan komputermu terhubung ke internet.</p>`;
+            resultBox.style.display = 'block';
+            console.error(error);
+        }
+    }
+</script>
+
+</body>
+</html>
